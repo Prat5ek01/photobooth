@@ -88,6 +88,7 @@ export default function Room({ params }: { params: { id: string } }) {
   const [photos, setPhotos] = useState<string[]>([]);
   const [editing, setEditing] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [codeCopied, setCodeCopied] = useState(false);
 
   // Editor state
   const [filter, setFilter] = useState("Original");
@@ -442,6 +443,12 @@ export default function Room({ params }: { params: { id: string } }) {
     setTimeout(() => setCopied(false), 1500);
   };
 
+  const copyCode = async () => {
+    await navigator.clipboard.writeText(roomId);
+    setCodeCopied(true);
+    setTimeout(() => setCodeCopied(false), 1500);
+  };
+
   const savePng = async () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -498,9 +505,15 @@ export default function Room({ params }: { params: { id: string } }) {
   if (status === "full") {
     return (
       <Centered>
-        <p className="mt-4 text-cocoa/80">
-          This room is already full. Create a new room to start a session.
+        <p className="max-w-sm text-cocoa/80">
+          This room already has two people in it.
         </p>
+        <a
+          href="/"
+          className="mt-6 rounded-full bg-rose px-6 py-3 font-semibold text-white shadow-lg shadow-rose/30 transition hover:bg-[#ff7a9c]"
+        >
+          Create a new room
+        </a>
       </Centered>
     );
   }
@@ -544,6 +557,35 @@ export default function Room({ params }: { params: { id: string } }) {
               }
             />
           </div>
+
+          {/* Shareable code — shown until the partner connects */}
+          {status !== "ready" && (
+            <div className="mx-auto mt-5 flex max-w-sm flex-col items-center rounded-2xl border border-rose/20 bg-white/70 px-6 py-5 text-center shadow-sm">
+              <p className="text-xs font-medium uppercase tracking-widest text-cocoa/50">
+                Share this code
+              </p>
+              <p className="my-2 select-all font-display text-4xl font-bold uppercase tracking-[0.3em] text-rose">
+                {roomId}
+              </p>
+              <p className="mb-4 text-xs text-cocoa/50">
+                Your partner enters it on the home page, or opens the link.
+              </p>
+              <div className="flex gap-2">
+                <button
+                  onClick={copyCode}
+                  className="rounded-full bg-rose px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#ff7a9c]"
+                >
+                  {codeCopied ? "Code copied" : "Copy code"}
+                </button>
+                <button
+                  onClick={copyLink}
+                  className="rounded-full border border-rose/40 bg-white px-4 py-2 text-sm font-semibold text-rose transition hover:bg-blush"
+                >
+                  {copied ? "Link copied" : "Copy link"}
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Status + start */}
           <div className="mt-5 flex flex-col items-center gap-3">
