@@ -1,0 +1,34 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+}
+
+body {
+  background: radial-gradient(1200px 600px at 50% -10%, #ffe6ef 0%, #fff 55%);
+  color: #5b3a4a;
+  min-height: 100vh;
+}
+
+/* Full-screen white flash used on capture */
+.flash {
+  position: fixed;
+  inset: 0;
+  background: #fff;
+  z-index: 60;
+  pointer-events: none;
+  opacity: 0;
+}
+.flash.on {
+  animation: flash 260ms ease-out;
+}
+@keyframes flash {
+  0% { opacity: 0.95; }
+  100% { opacity: 0; }
+}
+
+/* Hide scrollbars on the filter carousel */
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
