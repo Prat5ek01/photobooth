@@ -19,3 +19,6 @@
 npm-debug.log*
 .vercel
 next-env.d.ts
+
+# TS build cache
+tsconfig.tsbuildinfo
