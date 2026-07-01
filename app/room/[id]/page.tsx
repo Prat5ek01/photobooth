@@ -120,10 +120,27 @@ export default function Room({ params }: { params: { id: string } }) {
       return;
     }
     let mounted = true;
-    myIdRef.current =
+    let cleanupExtra = () => {}; // removes the pagehide listener on unmount
+
+    // Stable id for THIS tab + room. Reused across refreshes (sessionStorage)
+    // so reconnecting doesn't leave "ghost" copies of us in the room's
+    // presence, which previously inflated the count and tripped "room full".
+    const newId = () =>
       typeof crypto !== "undefined" && "randomUUID" in crypto
         ? crypto.randomUUID()
         : Math.random().toString(36).slice(2);
+    const storageKey = `pb-id-${roomId}`;
+    let myId = "";
+    try {
+      myId = sessionStorage.getItem(storageKey) || "";
+      if (!myId) {
+        myId = newId();
+        sessionStorage.setItem(storageKey, myId);
+      }
+    } catch {
+      myId = newId(); // private mode / storage blocked
+    }
+    myIdRef.current = myId;
 
     const teardownPeer = () => {
       peerRef.current?.destroy?.();
@@ -197,19 +214,27 @@ export default function Room({ params }: { params: { id: string } }) {
 
       // Presence tells us who's in the room and who initiates the offer.
       channel.on("presence", { event: "sync" }, () => {
-        const keys = Object.keys(channel.presenceState()).sort();
-        const allowed = keys.slice(0, 2); // first two participants only
-        if (!allowed.includes(myIdRef.current)) {
-          setStatus("full");
-          channel.untrack();
-          return;
-        }
-        if (keys.length >= 2) {
-          // Deterministic initiator: the lower-sorted id makes the offer.
-          createPeer(allowed[0] === myIdRef.current, channel);
-        } else {
+        const myKey = myIdRef.current;
+        const keys = Object.keys(channel.presenceState());
+
+        // Ignore syncs that fire before OUR OWN presence is registered.
+        // (Previously this path could falsely declare the room "full".)
+        if (!keys.includes(myKey)) return;
+
+        // Count everyone who isn't us. A solo user has zero "others" and must
+        // never be told the room is full.
+        const others = keys.filter((k) => k !== myKey);
+
+        if (others.length === 0) {
           teardownPeer();
           setStatus("waiting");
+        } else if (others.length === 1) {
+          // Exactly one partner. Deterministic initiator: lower id makes offer.
+          createPeer(myKey < others[0], channel);
+        } else {
+          // Two or more other participants are genuinely present.
+          setStatus("full");
+          channel.untrack();
         }
       });
 
@@ -219,12 +244,21 @@ export default function Room({ params }: { params: { id: string } }) {
           await channel.track({ joinedAt: Date.now() });
         }
       });
+
+      // Leave cleanly the moment the tab is closed/backgrounded so we don't
+      // linger as a ghost in presence. `pagehide` is the most reliable across
+      // browsers (including Brave and mobile Safari).
+      const onLeave = () => channel.untrack();
+      window.addEventListener("pagehide", onLeave);
+      cleanupExtra = () => window.removeEventListener("pagehide", onLeave);
     };
 
     init();
 
     return () => {
       mounted = false;
+      cleanupExtra();
+      channelRef.current?.untrack();
       channelRef.current?.unsubscribe();
       channelRef.current = null;
       peerRef.current?.destroy?.();
